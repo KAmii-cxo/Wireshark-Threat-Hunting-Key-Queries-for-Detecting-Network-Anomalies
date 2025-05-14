@@ -1,200 +1,186 @@
 # Wireshark Threat Hunting – Key Queries for Detecting Network Anomalies
 
-A curated list of Wireshark display filters useful for threat hunting and detecting suspicious or malicious network behavior.
+A curated list of Wireshark display filters useful for **threat hunting**, **network monitoring**, and **malware investigation**. Use these filters to detect suspicious or malicious activities across various protocols.
 
 ---
 
-## 🔍 FTP
+## 🔍 FTP (File Transfer Protocol)
 
-* **FTP Login Successful**
-  `ftp.response.code == 230`
-  *Indicates successful login to an FTP server.*
+* `ftp.response.code == 230`
+  ✅ *Shows a successful FTP login, which could be used to check for unauthorized access.*
 
-* **FTP Command PASV (Passive Mode)**
-  `ftp.request.command == "PASV"`
-  *Requests passive mode, useful for detecting data exfiltration.*
+* `ftp.request.command == "PASV"`
+  ✅ *Passive mode file transfers are often used in malware exfiltration or to evade firewalls.*
 
-* **FTP Command LIST (Directory Listing)**
-  `ftp.request.command == "LIST"`
-  *Used to retrieve file listings. May indicate probing.*
+* `ftp.request.command == "LIST"`
+  ✅ *Lists directory contents. Repeated usage may indicate directory snooping or probing.*
 
 ---
 
-## 🌐 HTTP
+## 🌐 HTTP (Web Traffic)
 
-* **HTTP GET Request**
-  `http.request.method == "GET"`
+* `http.request.method == "GET"`
+  ✅ *Standard request for fetching web resources (pages, scripts, etc.).*
 
-* **HTTP POST Request**
-  `http.request.method == "POST"`
+* `http.request.method == "POST"`
+  ✅ *Used to send data (like forms or files) to a web server. Useful for detecting data exfiltration.*
 
-* **HTTP 200 OK**
-  `http.response.code == 200`
+* `http.response.code == 200`
+  ✅ *Successful HTTP request. Can be used to verify connections.*
 
-* **HTTP 404 Not Found**
-  `http.response.code == 404`
+* `http.response.code == 404`
+  ✅ *Page not found. Excessive 404s may indicate scanning.*
 
-* **HTTP Redirect (301/302)**
-  `http.response.code == 301 or http.response.code == 302`
+* `http.response.code == 301 or http.response.code == 302`
+  ✅ *Redirects. Watch for unusual redirects to suspicious domains.*
 
-* **Suspicious HTTP POST Requests (Exfiltration)**
-  `http.request.method == "POST" and http.content_length > 1000`
+* `http.request.method == "POST" and http.content_length > 1000`
+  ✅ *Large POST requests may indicate exfiltration of sensitive data.*
 
-* **HTTP Response with Large Payload**
-  `http.response.code == 200 and http.content_length > 5000`
+* `http.response.code == 200 and http.content_length > 5000`
+  ✅ *May show large file downloads that should be verified.*
 
-* **HTTP Request to Suspicious Domain**
-  `http.host == "suspicious.com"`
+* `http.host == "suspicious.com"`
+  ✅ *Requests to a known malicious domain.*
 
-* **HTTP Content-Type: JSON**
-  `http.content_type == "application/json"`
+* `http.content_type == "application/json"`
+  ✅ *Indicates JSON API traffic. Can help detect command-and-control (C2) data.*
 
-* **HTTP Basic Authentication**
-  `http.authorization`
+* `http.authorization`
+  ✅ *Detects basic HTTP authentication headers, useful for credential harvesting detection.*
 
-* **Suspicious User-Agent (e.g. sqlmap)**
-  `http.user_agent contains "sqlmap"`
+* `http.user_agent contains "sqlmap"`
+  ✅ *Sqlmap is a common SQL injection tool. This filter detects its usage.*
 
-* **HTTP Response with Specific Cookie**
-  `http.cookie contains "sessionid"`
+* `http.cookie contains "sessionid"`
+  ✅ *Used to track session hijacking attempts or investigate session fixation.*
 
-* **Unencrypted HTTP on Port 443**
-  `http and tcp.dstport == 443`
-
----
-
-## 📡 DNS
-
-* **Any DNS Traffic**
-  `dns`
-
-* **DNS Query for Specific Domain**
-  `dns.qry.name == "example.com"`
-
-* **Large Number of DNS Requests from Host**
-  `dns and ip.src == <IP_ADDRESS>`
-
-* **DNS Tunneling Detection**
-  `dns.qry.name contains ".base64"`
-
-* **DNS to Malicious Domain**
-  `dns.qry.name == "malicious.com"`
-
-* **Excessive NXDOMAIN Responses**
-  `dns.flags.rcode == 3`
-
-* **DNS Flood Detection (Many Responses)**
-  `dns and dns.flags.response == 1`
+* `http and tcp.dstport == 443`
+  ⚠️ *Unencrypted HTTP traffic on port 443 (normally HTTPS). Could be suspicious or misconfigured.*
 
 ---
 
-## 🔐 TLS / SSL
+## 📡 DNS (Domain Name System)
 
-* **All TLS/SSL Traffic**
-  `tls`
+* `dns`
+  ✅ *All DNS traffic – useful for general monitoring.*
 
-* **TLS Handshake**
-  `tls.handshake`
+* `dns.qry.name == "example.com"`
+  ✅ *Tracks queries to a specific domain.*
 
-* **TLS ClientHello with Weak Cipher**
-  `tls.handshake.ciphersuite == 0x0035`
+* `dns and ip.src == <IP_ADDRESS>`
+  ✅ *Shows DNS traffic from a specific host – helps detect DNS tunneling.*
 
-* **Unusual TLS Handshake Patterns**
-  `tls.handshake`
-  *(Look for anomalies manually.)*
+* `dns.qry.name contains ".base64"`
+  ⚠️ *Possible DNS tunneling attempt using encoded data in subdomains.*
+
+* `dns.qry.name == "malicious.com"`
+  ✅ *Detects access to known bad domains – based on threat intel.*
+
+* `dns.flags.rcode == 3`
+  ⚠️ *NXDOMAIN response – the domain doesn't exist. High volume may indicate domain scanning or tunneling.*
+
+* `dns and dns.flags.response == 1`
+  ✅ *Filters for DNS response packets – can be used to measure flood or unusual answers.*
+
+---
+
+## 🔐 TLS / SSL (Secure Traffic)
+
+* `tls`
+  ✅ *All TLS/SSL encrypted traffic.*
+
+* `tls.handshake`
+  ✅ *TLS handshake data – useful to analyze client/server negotiation.*
+
+* `tls.handshake.ciphersuite == 0x0035`
+  ⚠️ *Weak cipher suite (e.g., TLS\_RSA\_WITH\_AES\_256\_CBC\_SHA) that should be flagged.*
+
+* `tls.handshake`
+  ⚠️ *Look for irregular or repeated handshakes – may indicate scanning or failed decryption.*
 
 ---
 
 ## 🧱 TCP & Connection Flags
 
-* **TCP SYN (Connection Start)**
-  `tcp.flags.syn == 1 and tcp.flags.ack == 0`
+* `tcp.flags.syn == 1 and tcp.flags.ack == 0`
+  ✅ *SYN packet – beginning of a TCP handshake. Monitor for scans and DDoS.*
 
-* **TCP FIN (Connection End)**
-  `tcp.flags.fin == 1`
+* `tcp.flags.fin == 1`
+  ✅ *FIN flag indicates connection termination. Could help detect teardown patterns.*
 
-* **TCP Retransmissions**
-  `tcp.analysis.retransmission`
+* `tcp.analysis.retransmission`
+  ⚠️ *Retransmitted packets. Excessive retransmits may signal congestion or evasion techniques.*
 
-* **TCP Window Size > 0**
-  `tcp.window_size > 0`
+* `tcp.window_size > 0`
+  ✅ *Useful for detecting active TCP flows or spotting zero-window anomalies.*
 
-* **SYN Flood Detection**
-  `tcp.flags.syn == 1 and tcp.flags.ack == 0`
-  *(Look for many SYNs with no ACKs.)*
+* `tcp.flags.syn == 1 and tcp.flags.ack == 0`
+  ⚠️ *Multiple SYNs without ACKs = SYN flood attempt (DoS).*
 
-* **Port Scanning Behavior**
-  `tcp.flags.syn == 1 and tcp.dstport not in {80, 443, 22}`
+* `tcp.flags.syn == 1 and tcp.dstport not in {80, 443, 22}`
+  ⚠️ *TCP scan activity – scanning non-standard ports.*
 
-* **Suspicious Ports (Non-standard)**
-  `tcp.dstport not in {22, 80, 443, 53}`
+* `tcp.dstport not in {22, 80, 443, 53}`
+  ⚠️ *Non-standard ports – could indicate backdoors or unauthorized services.*
 
 ---
 
 ## 📡 UDP / ICMP / Other Protocols
 
-* **UDP Traffic**
-  `udp`
+* `udp`
+  ✅ *All UDP traffic. Used for DNS, SNMP, VoIP, etc.*
 
-* **ICMP Echo Request (Ping)**
-  `icmp.type == 8`
+* `icmp.type == 8`
+  ✅ *ICMP Echo Request – typical ping.*
 
-* **ICMP Echo Reply**
-  `icmp.type == 0`
+* `icmp.type == 0`
+  ✅ *ICMP Echo Reply – response to ping.*
 
-* **ARP Requests**
-  `arp.opcode == 1`
+* `arp.opcode == 1`
+  ✅ *ARP request – useful for local network scans or spoof detection.*
 
 ---
 
-## 💻 Protocol-Specific
+## 💻 Protocol-Specific Monitoring
 
-* **RDP Traffic (Remote Desktop)**
-  `tcp.port == 3389`
+* `tcp.port == 3389`
+  ✅ *RDP traffic – monitor for remote access attempts.*
 
-* **RDP Session Hijacking or Unauthorized Access**
-  `tcp.port == 3389` *(Investigate unusual IPs)*
+* `ssh.auth.failed == 1`
+  ⚠️ *SSH brute-force detection (not always available unless Wireshark has that detail).*
 
-* **SSH Brute Force Attempts**
-  `ssh.auth.failed == 1`
+* `ssh and ip.src == <new_IP_ADDRESS>`
+  ✅ *Check for SSH logins from new or unauthorized IPs.*
 
-* **SSH Login from New IP**
-  `ssh and ip.src == <new_IP_ADDRESS>`
+* `smb2`
+  ✅ *SMBv2 file sharing traffic – useful for lateral movement detection.*
 
-* **SMBv2 Traffic (Suspicious File Sharing)**
-  `smb2`
+* `smtp.command == "HELO"`
+  ✅ *SMTP command – good for identifying email senders or relays.*
 
-* **SMTP HELO Command**
-  `smtp.command == "HELO"`
-
-* **Telnet Traffic**
-  `telnet`
+* `telnet`
+  ⚠️ *Plaintext remote access. Should not be used in secure environments.*
 
 ---
 
 ## ⚠️ Suspicious or Malicious Indicators
 
-* **Malformed Packets**
-  `frame.validation_failed == 1`
+* `frame.validation_failed == 1`
+  ⚠️ *Malformed packets – could be crafted for attacks or tool errors.*
 
-* **Traffic to/from Known Malicious IP**
-  `ip.src == <Malware_IP> or ip.dst == <Malware_IP>`
+* `ip.src == <Malware_IP> or ip.dst == <Malware_IP>`
+  ⚠️ *Known bad IP address – based on threat intelligence feeds.*
 
-* **Large Traffic from One Host (Possible DDoS)**
-  `ip.src == <IP_ADDRESS> and ip.len > 1000`
+* `ip.src == <IP_ADDRESS> and ip.len > 1000`
+  ⚠️ *Large packet sizes may signal data exfiltration, DDoS, or file transfers.*
 
 ---
 
-> Replace `<IP_ADDRESS>`, `<new_IP_ADDRESS>`, or `<Malware_IP>` with actual values for your investigation.
+> ⚙️ Replace `<IP_ADDRESS>`, `<Malware_IP>`, and other placeholders with actual values from your investigation.
 
 ---
 
 ## 📚 Credits
 
-Compiled by threat hunters and security analysts to aid in real-time detection and forensic packet analysis.
-
----
-
-You can copy this directly into your `README.md`, and GitHub will render it as a clean and organized document.
-
-If you'd like, I can also create a GitHub-friendly `.md` file version for you to upload. Just let me know.
+Compiled for SOC analysts, incident responders, and security enthusiasts to enhance **network visibility** and **incident response workflows** using Wireshark.
